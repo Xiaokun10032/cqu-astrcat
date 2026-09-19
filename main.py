@@ -6,7 +6,7 @@ import re
 
 
 @register(
-    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1"
+    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2"
 )
 class CquAstrcat(Star):
     KEY_ROOM = "user_room:"
