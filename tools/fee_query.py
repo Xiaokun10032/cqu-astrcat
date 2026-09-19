@@ -6,20 +6,22 @@ from typing import Optional, Union
 
 class FeeQueryError(Exception):
     """电费查询失败，主插件只需要捕获这一种异常"""
+
     pass
 
 
 @dataclass
 class FeeInfo:
     """结构化的电费信息，方便主插件使用"""
+
     room: str = ""
-    amount: str = ""          # 剩余金额
-    e_subsidy: str = ""       # 电剩余补助
-    w_subsidy: str = ""       # 水剩余补助
-    e_meter_addr: str = ""    # 电表地址
-    e_meter_value: str = ""   # 电表读数
-    w_meter_addr: str = ""    # 水表地址
-    w_meter_value: str = ""   # 水表读数
+    amount: str = ""  # 剩余金额
+    e_subsidy: str = ""  # 电剩余补助
+    w_subsidy: str = ""  # 水剩余补助
+    e_meter_addr: str = ""  # 电表地址
+    e_meter_value: str = ""  # 电表读数
+    w_meter_addr: str = ""  # 水表地址
+    w_meter_value: str = ""  # 水表读数
     account_id: str = ""
     raw: dict = field(default_factory=dict)
 
@@ -98,7 +100,10 @@ class FeeQueryClient:
 
         try:
             resp = await self._client.post(
-                self.URL, headers=headers, cookies=cookies, data=data,
+                self.URL,
+                headers=headers,
+                cookies=cookies,
+                data=data,
             )
         except httpx.RequestError as e:
             raise FeeQueryError(f"网络请求失败：{e}") from e

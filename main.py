@@ -4,19 +4,23 @@ from astrbot.api import logger, AstrBotConfig
 from .tools import FeeQueryClient, FeeQueryError
 import re
 
-@register("astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1")
+
+@register(
+    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1"
+)
 class CquAstrcat(Star):
-    KEY_ROOM="user_room:"
+    KEY_ROOM = "user_room:"
+
     def __init__(self, context, config: AstrBotConfig):
         super().__init__(context)
-        self.config = config            
+        self.config = config
         self.fee_client: FeeQueryClient | None = None
 
-# ----------Life Cycly-----------------
+    # ----------Life Cycly-----------------
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
         self.fee_client = FeeQueryClient(
-        timeout=int(self.config.get("timeout", 10))
+            timeout=int(self.config.get("timeout", 10))
         )  # 实例化httpx异步处理client
 
     async def _client(self) -> FeeQueryClient:
@@ -58,12 +62,13 @@ class CquAstrcat(Star):
     @filter.command_group("cqu")
     def cqu():
         pass
+
     @cqu.command("bind")
     async def bind(self, event: AstrMessageEvent, room: str = ""):
-        """绑定房间：/bind B4611"""
+        """绑定房间：/cqu bind B4611"""
         room = room.strip().upper()
         if not room:
-            yield event.plain_result("用法：/bind 房间号，例如 /bind B4611")
+            yield event.plain_result("用法：/cqu bind 房间号，例如 /bind B4611")
             return
         # if not self.ROOM_RE.match(room):
         #     yield event.plain_result(
@@ -73,34 +78,32 @@ class CquAstrcat(Star):
 
         qq = str(event.get_sender_id())
         await self.put_kv_data(self._key(qq), {"room": room})
-        yield event.plain_result(
-            f"✅ 绑定成功：{room}\n使用 /fee 查询电费"
-        )
+        yield event.plain_result(f"✅ 绑定成功：{room}\n使用 /cqu fee 查询电费")
 
     @cqu.command("unbind")
     async def unbind(self, event: AstrMessageEvent):
-        """解绑：/unbind"""
+        """解绑：/cqu unbind"""
         qq = str(event.get_sender_id())
         await self.delete_kv_data(self._key(qq))
         yield event.plain_result("✅ 已解除绑定")
 
     @cqu.command("myroom")
     async def myroom(self, event: AstrMessageEvent):
-        """查看绑定：/myroom"""
+        """查看绑定：/cqu myroom"""
         qq = str(event.get_sender_id())
         info = await self.get_kv_data(self._key(qq), None)
         if not info:
-            yield event.plain_result("你还没有绑定房间，使用 /bind B4611")
+            yield event.plain_result("你还没有绑定房间，使用 /cqu bind [房间代号]")
             return
         yield event.plain_result(f"当前绑定：{info['room']}")
 
     @cqu.command("fee")
     async def fee(self, event: AstrMessageEvent):
-        """查询电费：/fee"""
+        """查询电费：/cqu fee"""
         qq = str(event.get_sender_id())
         info = await self.get_kv_data(self._key(qq), None)
         if not info:
-            yield event.plain_result("请先使用 /bind 房间号 绑定")
+            yield event.plain_result("请先使用 /cqu bind 房间号 绑定")
             return
 
         token = self._auth_token()
@@ -125,7 +128,6 @@ class CquAstrcat(Star):
             return
 
         yield event.plain_result(result.to_text())
-
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
