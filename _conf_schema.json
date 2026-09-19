@@ -1,0 +1,38 @@
+{
+  "auth_token": {
+    "description": "synjones-auth 令牌",
+    "type": "string",
+    "secret": true,
+    "obvious_hint": true,
+    "hint": "形如 bearer xxx，从抓包/请求头中获取。过期后需到 WebUI 更新。",
+    "default": ""
+  },
+  "cookie": {
+    "description": "Cookie",
+    "type": "text",
+    "secret": true,
+    "hint": "完整 Cookie 字符串，如：SESSION=; loginFromDeviceToken=xxx; TGC=\"third_login:TGT-xxx\"",
+    "default": ""
+  },
+  "feeitemid": {
+    "description": "费用项 ID",
+    "type": "string",
+    "default": "448",
+    "hint": "一般不用改"
+  },
+  "fee_type": {
+    "description": "费用类型",
+    "type": "string",
+    "default": "IEC"
+  },
+  "level": {
+    "description": "层级",
+    "type": "int",
+    "default": 2
+  },
+  "timeout": {
+    "description": "请求超时（秒）",
+    "type": "int",
+    "default": 10
+  }
+}

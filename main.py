@@ -1,24 +1,134 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
+from .tools import FeeQueryClient, FeeQueryError
+import re
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
-    def __init__(self, context: Context):
+@register("cqu-astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1")
+class CquAstrcat(Star):
+    KEY_ROOM="user_room:"
+    def __init__(self, context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config            
+        self.fee_client: FeeQueryClient | None = None
 
+# ----------Life Cycly-----------------
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+        self.fee_client = FeeQueryClient(
+        timeout=int(self.config.get("timeout", 10))
+        )  # 实例化httpx异步处理client
 
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+    async def _client(self) -> FeeQueryClient:
+        """懒加载兜底：防止 initialize 没被调用"""
+        if self.fee_client is None:
+            self.fee_client = FeeQueryClient(
+                timeout=int(self.config.get("timeout", 10))
+            )
+        return self.fee_client
+
+    # ---------- 配置读取 ----------
+
+    def _key(self, qq: str) -> str:
+        return f"{self.KEY_ROOM}{qq}"
+
+    def _auth_token(self) -> str:
+        return (self.config.get("auth_token") or "").strip()
+
+    def _cookies(self) -> dict:
+        """把配置里的 cookie 字符串解析成 dict"""
+        raw = (self.config.get("cookie") or "").strip()
+        result = {}
+        for part in raw.split(";"):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            k, v = part.split("=", 1)
+            result[k.strip()] = v.strip()
+        return result
+
+    def _query_params(self) -> dict:
+        return {
+            "feeitemid": str(self.config.get("feeitemid", "448")),
+            "fee_type": str(self.config.get("fee_type", "IEC")),
+            "level": int(self.config.get("level", 2)),
+        }
+
+    # ---------- 命令 ----------
+    @filter.command_group("cqu")
+    def cqu():
+        pass
+    @cqu.command("bind")
+    async def bind(self, event: AstrMessageEvent, room: str = ""):
+        """绑定房间：/bind B4611"""
+        room = room.strip().upper()
+        if not room:
+            yield event.plain_result("用法：/bind 房间号，例如 /bind B4611")
+            return
+        # if not self.ROOM_RE.match(room):
+        #     yield event.plain_result(
+        #         "房间号格式看起来不对，应形如 B4611（字母 + 3~6 位数字）"
+        #     )
+        #     return
+
+        qq = str(event.get_sender_id())
+        await self.put_kv_data(self._key(qq), {"room": room})
+        yield event.plain_result(
+            f"✅ 绑定成功：{room}\n使用 /fee 查询电费"
+        )
+
+    @cqu.command("unbind")
+    async def unbind(self, event: AstrMessageEvent):
+        """解绑：/unbind"""
+        qq = str(event.get_sender_id())
+        await self.delete_kv_data(self._key(qq))
+        yield event.plain_result("✅ 已解除绑定")
+
+    @cqu.command("myroom")
+    async def myroom(self, event: AstrMessageEvent):
+        """查看绑定：/myroom"""
+        qq = str(event.get_sender_id())
+        info = await self.get_kv_data(self._key(qq), None)
+        if not info:
+            yield event.plain_result("你还没有绑定房间，使用 /bind B4611")
+            return
+        yield event.plain_result(f"当前绑定：{info['room']}")
+
+    @cqu.command("fee")
+    async def fee(self, event: AstrMessageEvent):
+        """查询电费：/fee"""
+        qq = str(event.get_sender_id())
+        info = await self.get_kv_data(self._key(qq), None)
+        if not info:
+            yield event.plain_result("请先使用 /bind 房间号 绑定")
+            return
+
+        token = self._auth_token()
+        if not token:
+            yield event.plain_result(
+                "⚠️ 插件尚未配置 auth_token，请联系管理员在 WebUI 配置"
+            )
+            return
+
+        cookies = self._cookies()
+        client = await self._client()
+
+        try:
+            result = await client.query(
+                room=info["room"],
+                auth_token=token,
+                cookies=cookies,
+                **self._query_params(),
+            )
+        except FeeQueryError as e:
+            yield event.plain_result(f"❌ 查询失败：{e}")
+            return
+
+        yield event.plain_result(result.to_text())
+
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        if self.fee_client:
+            await self.fee_client.close()
+            self.fee_client = None

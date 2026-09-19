@@ -1,0 +1,9 @@
+{
+  "pythonVersion": "3.12",
+  "executionRoots": ["../../.."],
+  "extraPaths": [
+    "../../..",
+    "C:/Users/xiaok/AppData/Roaming/Python/Python311/site-packages"
+  ],
+  "reportMissingModuleSource": "none"
+}
