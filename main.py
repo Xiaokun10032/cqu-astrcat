@@ -4,7 +4,7 @@ from astrbot.api import logger, AstrBotConfig
 from .tools import FeeQueryClient, FeeQueryError
 import re
 
-@register("cqu-astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1")
+@register("astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.1")
 class CquAstrcat(Star):
     KEY_ROOM="user_room:"
     def __init__(self, context, config: AstrBotConfig):
