@@ -6,7 +6,7 @@ import re
 
 
 @register(
-    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2"
+    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2.1"
 )
 class CquAstrcat(Star):
     KEY_ROOM = "user_room:"
@@ -39,9 +39,9 @@ class CquAstrcat(Star):
     def _auth_token(self) -> str:
         return (self.config.get("auth_token") or "").strip()
 
-    def _cookies(self) -> dict:
-        """把配置里的 cookie 字符串解析成 dict"""
-        raw = (self.config.get("cookie") or "").strip()
+    def _cookies(self, campus: str) -> dict:
+        """把配置里对应校区的 cookie 字符串解析成 dict"""
+        raw = (self.config.get(campus, {}).get("cookie") or "").strip()
         result = {}
         for part in raw.split(";"):
             part = part.strip()
@@ -51,9 +51,9 @@ class CquAstrcat(Star):
             result[k.strip()] = v.strip()
         return result
 
-    def _query_params(self) -> dict:
+    def _query_params(self, campus: str) -> dict:
         return {
-            "feeitemid": str(self.config.get("feeitemid", "448")),
+            "feeitemid": str(self.config.get(campus, {}).get("feeitemid", "448")),
             "fee_type": str(self.config.get("fee_type", "IEC")),
             "level": int(self.config.get("level", 2)),
         }
@@ -113,15 +113,17 @@ class CquAstrcat(Star):
             )
             return
 
-        cookies = self._cookies()
         client = await self._client()
-
+        campus = client.detect_campus(info["room"])
+        cookies = self._cookies(campus)
+        
         try:
             result = await client.query(
+                campus=campus,
                 room=info["room"],
                 auth_token=token,
                 cookies=cookies,
-                **self._query_params(),
+                **self._query_params(campus),
             )
         except FeeQueryError as e:
             yield event.plain_result(f"❌ 查询失败：{e}")

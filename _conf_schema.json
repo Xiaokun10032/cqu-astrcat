@@ -7,18 +7,43 @@
     "hint": "形如 bearer xxx，从抓包/请求头中获取。过期后需到 WebUI 更新。",
     "default": ""
   },
-  "cookie": {
-    "description": "Cookie",
-    "type": "text",
-    "secret": true,
-    "hint": "完整 Cookie 字符串，如：SESSION=; loginFromDeviceToken=xxx; TGC=\"third_login:TGT-xxx\"",
-    "default": ""
+  "d": {
+    "description": "D 校区查询参数",
+    "type": "object",
+    "items": {
+      "cookie": {
+        "description": "Cookie",
+        "type": "text",
+        "secret": true,
+        "hint": "完整 Cookie 字符串，如：SESSION=; loginFromDeviceToken=xxx; TGC=\"third_login:TGT-xxx\"",
+        "default": ""
+      },
+      "feeitemid": {
+        "description": "费用项 ID",
+        "type": "string",
+        "default": "448",
+        "hint": "虎溪448, 沙坪坝449"
+      }
+    }
   },
-  "feeitemid": {
-    "description": "费用项 ID",
-    "type": "string",
-    "default": "448",
-    "hint": "一般不用改"
+  "a": {
+    "description": "A 校区查询参数",
+    "type": "object",
+    "items": {
+      "cookie": {
+        "description": "Cookie",
+        "type": "text",
+        "secret": true,
+        "hint": "完整 Cookie 字符串，如：SESSION=; loginFromDeviceToken=xxx; TGC=\"third_login:TGT-xxx\"",
+        "default": ""
+      },
+      "feeitemid": {
+        "description": "费用项 ID",
+        "type": "string",
+        "default": "449",
+        "hint": "虎溪448, 沙坪坝449"
+      }
+    }
   },
   "fee_type": {
     "description": "费用类型",
