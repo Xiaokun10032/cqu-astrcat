@@ -63,7 +63,9 @@ class CquAstrcat(Star):
     def cqu():
         pass
 
-    @cqu.command("bind")
+    # @cqu.command("school_bus", alias={"sb", "校车"})
+
+    @cqu.command("bind", alias={"b"})
     async def bind(self, event: AstrMessageEvent, room: str = ""):
         """绑定房间：/cqu bind B4611"""
         room = room.strip().upper()
@@ -80,7 +82,7 @@ class CquAstrcat(Star):
         await self.put_kv_data(self._key(qq), {"room": room})
         yield event.plain_result(f"✅ 绑定成功：{room}\n使用 /cqu fee 查询电费")
 
-    @cqu.command("unbind")
+    @cqu.command("unbind", alias={"ub"})
     async def unbind(self, event: AstrMessageEvent):
         """解绑：/cqu unbind"""
         qq = str(event.get_sender_id())
@@ -116,7 +118,7 @@ class CquAstrcat(Star):
         client = await self._client()
         campus = client.detect_campus(info["room"])
         cookies = self._cookies(campus)
-        
+
         try:
             result = await client.query(
                 campus=campus,
