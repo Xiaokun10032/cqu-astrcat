@@ -31,7 +31,8 @@ class FeeInfo:
     raw: dict = field(default_factory=dict)
 
     def to_text(self) -> str:
-        lines = [f"🏠 房间：{self.room}"]
+        # lines = [f"🏠 房间：{self.room}"]
+        lines = [f"🏠 房间：*****"]
         if self.amount:
             lines.append(f"💰 剩余金额：{self.amount} 元")
         if self.e_price >= 0:

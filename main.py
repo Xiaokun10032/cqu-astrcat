@@ -6,7 +6,7 @@ import re
 
 
 @register(
-    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2.1"
+    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2.2"
 )
 class CquAstrcat(Star):
     KEY_ROOM = "user_room:"
@@ -80,7 +80,7 @@ class CquAstrcat(Star):
 
         qq = str(event.get_sender_id())
         await self.put_kv_data(self._key(qq), {"room": room})
-        yield event.plain_result(f"✅ 绑定成功：{room}\n使用 /cqu fee 查询电费")
+        yield event.plain_result(f"✅ 绑定成功：*****\n使用 /cqu fee 查询电费")
 
     @cqu.command("unbind", alias={"ub"})
     async def unbind(self, event: AstrMessageEvent):
