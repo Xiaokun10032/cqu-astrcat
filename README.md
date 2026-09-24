@@ -1,18 +1,18 @@
-# astrbot-plugin-helloworld
+# cqu-astrcat
 
-#Feature
+## Feature
 
 - 支持老校区/虎溪校区电费的查询
 - 一个账号，查询所有
 
-#Use
+## Use
 
 - 配置列表
     - token: 在微信一卡通登陆后抓包获得
     - cookie: 已预置，老校区/虎溪的查询接口不同，cookie需分开设置
     - other args: 已预置，方便接口变动后更改
 
-#Todo
+## Todo
 
 - [ ] 新增每日9点自动化查询所有已绑定用户的电费余额并记录，保留两天的数据，即今日凌晨与昨日凌晨的电费余额（KV）
 
