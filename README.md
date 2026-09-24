@@ -1,17 +1,16 @@
 # astrbot-plugin-helloworld
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+#Feature
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+- 支持老校区/虎溪校区电费的查询
+- 一个账号，查询所有
 
-# Supports
+#Use
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+- 配置列表
+    - token: 在微信一卡通登陆后抓包获得
+    - cookie: 已预置，老校区/虎溪的查询接口不同，cookie需分开设置
+    - other args: 已预置，方便接口变动后更改
 
 #Todo
 
@@ -25,4 +24,4 @@ AstrBot 插件模板 / A template plugin for AstrBot plugin feature
 
 - [ ] 记录昨日用电量，并在用户查询数据时返回
 
-- [ ] 对返回查询结果的房间信息打码
+- [x] 对返回查询结果的房间信息打码
