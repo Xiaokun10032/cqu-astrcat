@@ -70,7 +70,7 @@ class CquAstrcat(Star):
         """绑定房间：/cqu bind B4611"""
         room = room.strip().upper()
         if not room:
-            yield event.plain_result("用法：/cqu bind 房间号，例如 /bind B4611")
+            yield event.plain_result("用法：/cqu bind 房间号，例如 /cqu bind B4611")
             return
         # if not self.ROOM_RE.match(room):
         #     yield event.plain_result(
