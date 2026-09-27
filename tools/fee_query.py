@@ -1,7 +1,7 @@
 # tools/fee_query.py
 import re
 from dataclasses import dataclass, field
-from typing import Optional, Union, Literal
+from typing import Literal
 
 import httpx
 
@@ -30,9 +30,21 @@ class FeeInfo:
     account_id: str = ""
     raw: dict = field(default_factory=dict)
 
+    @property
+    def amount_value(self) -> float | None:
+        """剩余金额的数值形式，用于余额比较与差值计算。
+
+        Returns:
+            剩余金额；字段缺失或不是合法数字时为 None，例如接口返回空串。
+        """
+        try:
+            return float(str(self.amount).replace(",", "").strip())
+        except ValueError:
+            return None
+
     def to_text(self) -> str:
         # lines = [f"🏠 房间：{self.room}"]
-        lines = [f"🏠 房间：*****"]
+        lines = ["🏠 房间：*****"]
         if self.amount:
             lines.append(f"💰 剩余金额：{self.amount} 元")
         if self.e_price >= 0:
@@ -67,7 +79,7 @@ class FeeQueryClient:
 
     def __init__(self, timeout: float = 10.0):
         self._timeout = timeout
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     async def start(self):
         if self._client is None:
@@ -97,7 +109,7 @@ class FeeQueryClient:
         self,
         room: str,
         auth_token: str,
-        cookies: Union[dict, str],
+        cookies: dict | str,
         *,
         feeitemid: str = "448",
         fee_type: str = "IEC",

@@ -3,22 +3,48 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-from astrbot.api import AstrBotConfig
+from astrbot.api import AstrBotConfig, logger
 
-from .tools import FeeInfo, FeeQueryClient
+from .store import Store
+from .tools import FeeInfo, FeeQueryClient, FeeQueryError
+
+DEFAULT_THRESHOLD = 10.0
+"""余额提醒的默认阈值（元）。"""
+
+
+@dataclass
+class Usage:
+    """自某次快照以来的用电量。"""
+
+    spent: float
+    since: str
+
+
+@dataclass
+class BalanceAlert:
+    """一条待推送的余额不足提醒。"""
+
+    qq: str
+    session: str
+    amount: float
+    threshold: float
+    usage: Usage | None
 
 
 class CquService:
-    """电费查询编排：配置解析、连接池生命周期与查询调用。
+    """电费查询编排：配置解析、连接池生命周期、查询与日结计算。
 
     Args:
         config: 插件配置对象。
+        store: 插件数据访问层，用于读取历史快照。
     """
 
-    def __init__(self, config: AstrBotConfig) -> None:
+    def __init__(self, config: AstrBotConfig, store: Store) -> None:
         self._config = config
+        self._store = store
         self._client: FeeQueryClient | None = None
 
     @property
@@ -97,3 +123,93 @@ class CquService:
             cookies=self._cookies(campus),
             **self._query_params(campus),
         )
+
+    async def usage_since_snapshot(self, qq: str, current: float) -> Usage | None:
+        """计算自上次快照以来的用电量。
+
+        Args:
+            qq: 用户 QQ 号。
+            current: 本次查询到的余额。
+
+        Returns:
+            用电量；没有可用快照，或快照里没有该用户时为 None。
+        """
+        previous = await self._store.previous_snapshot()
+        if previous is None:
+            return None
+        date, balances = previous
+        if qq not in balances:
+            return None
+        return Usage(spent=balances[qq] - current, since=date)
+
+    async def snapshot_all(
+        self, bindings: dict[str, dict[str, Any]]
+    ) -> dict[str, float]:
+        """逐个查询所有已绑定用户的余额。
+
+        Args:
+            bindings: 全部绑定数据，键为 QQ 号。
+
+        Returns:
+            QQ 号到余额的映射。查询失败或余额无法解析的用户会被跳过，
+            避免个别房间的问题拖垮整批快照。
+        """
+        balances: dict[str, float] = {}
+        for qq, entry in bindings.items():
+            room = (entry or {}).get("room")
+            if not room:
+                continue
+            try:
+                info = await self.query_room(room)
+            except FeeQueryError as e:
+                logger.warning(f"[cqu-astrcat] 快照查询失败 qq={qq}：{e}")
+                continue
+            amount = info.amount_value
+            if amount is None:
+                logger.warning(
+                    f"[cqu-astrcat] 快照余额无法解析 qq={qq}：{info.amount!r}"
+                )
+                continue
+            balances[qq] = amount
+        return balances
+
+    def build_alerts(
+        self,
+        balances: dict[str, float],
+        bindings: dict[str, dict[str, Any]],
+        previous: tuple[str, dict[str, float]] | None,
+    ) -> list[BalanceAlert]:
+        """挑出余额低于阈值且开启了提醒的用户。
+
+        Args:
+            balances: 本次快照的余额。
+            bindings: 全部绑定数据。
+            previous: 上次快照 ``(日期, 余额映射)``，用于附带用电量，可为 None。
+
+        Returns:
+            待推送的提醒列表；未开启提醒或缺少会话标识的用户会被跳过。
+        """
+        alerts: list[BalanceAlert] = []
+        for qq, amount in balances.items():
+            entry = bindings.get(qq) or {}
+            if not entry.get("remind"):
+                continue
+            session = entry.get("session")
+            if not session:
+                continue
+            threshold = float(entry.get("threshold", DEFAULT_THRESHOLD))
+            if amount >= threshold:
+                continue
+            usage = None
+            if previous is not None and qq in previous[1]:
+                usage = Usage(spent=previous[1][qq] - amount, since=previous[0])
+            alerts.append(
+                BalanceAlert(
+                    qq=qq,
+                    session=session,
+                    amount=amount,
+                    threshold=threshold,
+                    usage=usage,
+                )
+            )
+        return alerts

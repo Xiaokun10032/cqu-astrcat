@@ -5,13 +5,19 @@
 
     {"<qq>": {"room": "B4611", "session": "...", "remind": true, "threshold": 10.0}}
 
+余额快照单独存放在另一个 key，按天追加、只保留最近若干天：:
+
+    [{"date": "2026-09-27", "balances": {"<qq>": 12.34}}]
+
 之所以不用「一用户一 key」，是因为插件 KV 没有枚举接口，定时任务需要一次性
-拿到全部绑定用户；聚合文档还能让「保留两天快照」这类需求只动一个 key。
+拿到全部绑定用户。快照与绑定分开，是因为定时任务在查询完所有用户后才回写，
+若与用户命令写入同一个 key，回写会覆盖期间发生的绑定操作。
 """
 
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from astrbot import logger
@@ -22,6 +28,15 @@ if TYPE_CHECKING:
 
 BINDINGS_KEY = "bindings"
 """聚合绑定文档的 KV key。"""
+
+HISTORY_KEY = "history"
+"""余额快照列表的 KV key。"""
+
+HISTORY_KEEP = 2
+"""快照保留天数，够算「昨日用电」即可。"""
+
+DATE_FORMAT = "%Y-%m-%d"
+"""快照日期格式，ISO 形式可直接按字符串比较大小。"""
 
 LEGACY_ROOM_PREFIX = "user_room:"
 """旧版按用户存储绑定房间的 key 前缀，仅用于一次性迁移。"""
@@ -91,6 +106,67 @@ class Store:
             del bindings[qq]
             await self._plugin.put_kv_data(BINDINGS_KEY, bindings)
             return True
+
+    async def set_remind(self, qq: str, remind: bool, threshold: float) -> bool:
+        """更新用户的余额提醒设置。
+
+        Args:
+            qq: 用户 QQ 号。
+            remind: 是否开启余额提醒。
+            threshold: 提醒阈值（元），需大于 0。
+
+        Returns:
+            是否更新成功；用户尚未绑定时返回 False。
+        """
+        async with self._lock:
+            bindings = await self.get_bindings()
+            entry = bindings.get(qq)
+            if entry is None:
+                return False
+            entry["remind"] = remind
+            entry["threshold"] = threshold
+            await self._plugin.put_kv_data(BINDINGS_KEY, bindings)
+            return True
+
+    # ---------- 余额快照 ----------
+    async def get_history(self) -> list[dict[str, Any]]:
+        """读取余额快照列表，按日期升序。
+
+        Returns:
+            形如 ``[{"date": "2026-09-27", "balances": {"<qq>": 12.34}}]``，
+            无数据时为空列表。
+        """
+        return await self._plugin.get_kv_data(HISTORY_KEY, []) or []
+
+    async def append_snapshot(self, balances: dict[str, float]) -> None:
+        """把今天的余额快照追加进历史，并裁掉超出保留天数的旧快照。
+
+        同一天重复调用会覆盖当天已有的快照。
+
+        Args:
+            balances: QQ 号到余额的映射。
+        """
+        today = datetime.now().strftime(DATE_FORMAT)
+        async with self._lock:
+            history = [e for e in await self.get_history() if e.get("date") != today]
+            history.append({"date": today, "balances": balances})
+            history.sort(key=lambda e: e.get("date", ""))
+            await self._plugin.put_kv_data(HISTORY_KEY, history[-HISTORY_KEEP:])
+
+    async def previous_snapshot(self) -> tuple[str, dict[str, float]] | None:
+        """取今天之前最近一次快照，用于计算用电量。
+
+        机器人停机导致中间缺天时，返回的是缺口之前那次快照，调用方应把日期
+        一并展示，让用户知道用电量覆盖的是哪一段。
+
+        Returns:
+            ``(日期, 余额映射)``；今天之前没有任何快照时为 None。
+        """
+        today = datetime.now().strftime(DATE_FORMAT)
+        for entry in reversed(await self.get_history()):
+            if entry.get("date", "") < today:
+                return entry["date"], entry.get("balances") or {}
+        return None
 
     async def migrate_legacy_bindings(self) -> None:
         """把旧版 ``user_room:{qq}`` 形式的绑定并入聚合文档。
