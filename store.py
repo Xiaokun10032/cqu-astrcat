@@ -107,13 +107,17 @@ class Store:
             await self._plugin.put_kv_data(BINDINGS_KEY, bindings)
             return True
 
-    async def set_remind(self, qq: str, remind: bool, threshold: float) -> bool:
+    async def set_remind(
+        self, qq: str, remind: bool, threshold: float, session: str = ""
+    ) -> bool:
         """更新用户的余额提醒设置。
 
         Args:
             qq: 用户 QQ 号。
             remind: 是否开启余额提醒。
             threshold: 提醒阈值（元），需大于 0。
+            session: 消息会话标识，为空时不覆盖旧值。开启提醒时传入当前会话，
+                即可把提醒目标从绑定时所在会话切换到当前会话。
 
         Returns:
             是否更新成功；用户尚未绑定时返回 False。
@@ -125,6 +129,8 @@ class Store:
                 return False
             entry["remind"] = remind
             entry["threshold"] = threshold
+            if session:
+                entry["session"] = session
             await self._plugin.put_kv_data(BINDINGS_KEY, bindings)
             return True
 

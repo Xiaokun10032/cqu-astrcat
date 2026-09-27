@@ -181,10 +181,11 @@ class CquAstrcat(Star):
             value = float(info.get("threshold", DEFAULT_THRESHOLD))
 
         enabled = action == "on"
-        await self.store.set_remind(qq, enabled, value)
-        yield event.plain_result(
-            f"✅ 余额提醒已{'开启' if enabled else '关闭'}，阈值 {value:.2f} 元"
-        )
+        await self.store.set_remind(qq, enabled, value, event.unified_msg_origin)
+        text = f"✅ 余额提醒已{'开启' if enabled else '关闭'}，阈值 {value:.2f} 元"
+        if enabled:
+            text += "\n提醒将发送到当前会话"
+        yield event.plain_result(text)
 
     @cqu.command("fee")
     async def fee(self, event: AstrMessageEvent):

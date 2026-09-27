@@ -181,6 +181,10 @@ class CquService:
     ) -> list[BalanceAlert]:
         """挑出余额低于阈值且开启了提醒的用户。
 
+        缺少会话标识的用户无法主动推送（只可能是旧版迁移过来的绑定，或曾
+        在解绑前开启过提醒），会被跳过并汇总记一条 warning —— 这类用户开启
+        了提醒却收不到消息，静默跳过会让问题无从排查。
+
         Args:
             balances: 本次快照的余额。
             bindings: 全部绑定数据。
@@ -190,12 +194,14 @@ class CquService:
             待推送的提醒列表；未开启提醒或缺少会话标识的用户会被跳过。
         """
         alerts: list[BalanceAlert] = []
+        missing_session: list[str] = []
         for qq, amount in balances.items():
             entry = bindings.get(qq) or {}
             if not entry.get("remind"):
                 continue
             session = entry.get("session")
             if not session:
+                missing_session.append(qq)
                 continue
             threshold = float(entry.get("threshold", DEFAULT_THRESHOLD))
             if amount >= threshold:
@@ -211,5 +217,11 @@ class CquService:
                     threshold=threshold,
                     usage=usage,
                 )
+            )
+        if missing_session:
+            logger.warning(
+                f"[cqu-astrcat] {len(missing_session)} 位用户开启了提醒但缺少会话标识，"
+                f"无法推送；重新 /cqu bind 或 /cqu remind on 即可修复："
+                f"{'、'.join(missing_session)}"
             )
         return alerts
