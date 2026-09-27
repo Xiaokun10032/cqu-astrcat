@@ -50,10 +50,9 @@ class CquAstrcat(Star):
 
     # ---------- 每日任务 ----------
     async def _daily_loop(self):
-        """每天 DAILY_HOUR 点记录全部绑定用户的余额快照并推送余额不足提醒。
+        """每天 DAILY_HOUR 点执行一次日结任务。
 
-        单次执行失败只记录日志，不影响后续天数的调度；单个用户的提醒推送
-        失败也不会中断其余用户。
+        单次执行失败由 `_daily_job` 内部消化，循环本身不会中断。
         """
         while True:
             now = datetime.now()
@@ -61,45 +60,54 @@ class CquAstrcat(Star):
             if next_run <= now:
                 next_run += timedelta(days=1)
             await asyncio.sleep((next_run - now).total_seconds())
+            await self._daily_job()
 
-            try:
-                bindings = await self.store.get_bindings()
-                balances = await self.service.snapshot_all(bindings)
-                previous = await self.store.previous_snapshot()
-                if balances:
-                    await self.store.append_snapshot(balances)
-                    logger.info(
-                        f"[cqu-astrcat] 每日快照完成，共 {len(balances)} 位用户"
+    async def _daily_job(self) -> tuple[int, int] | None:
+        """记录全部绑定用户的余额快照，并推送余额不足提醒。
+
+        单次执行失败只记录日志；单个用户的提醒推送失败也不会中断其余用户。
+
+        Returns:
+            ``(快照用户数, 成功推送的提醒数)``；整体执行失败时为 None。
+        """
+        try:
+            bindings = await self.store.get_bindings()
+            balances = await self.service.snapshot_all(bindings)
+            previous = await self.store.previous_snapshot()
+            if balances:
+                await self.store.append_snapshot(balances)
+                logger.info(f"[cqu-astrcat] 每日快照完成，共 {len(balances)} 位用户")
+            else:
+                logger.info("[cqu-astrcat] 每日快照没有可用数据")
+
+            pushed = 0
+            for alert in self.service.build_alerts(balances, bindings, previous):
+                try:
+                    text = (
+                        f"电费余额仅剩 {alert.amount:.2f} 元，"
+                        f"低于提醒阈值 {alert.threshold:.2f} 元"
                     )
-                else:
-                    logger.info("[cqu-astrcat] 每日快照没有可用数据")
-
-                for alert in self.service.build_alerts(balances, bindings, previous):
-                    try:
-                        text = (
-                            f"电费余额仅剩 {alert.amount:.2f} 元，"
-                            f"低于提醒阈值 {alert.threshold:.2f} 元"
+                    if alert.usage is not None and alert.usage.spent > 0:
+                        text += (
+                            f"，自 {alert.usage.since} 以来"
+                            f"已用电 {alert.usage.spent:.2f} 元"
                         )
-                        if alert.usage is not None and alert.usage.spent > 0:
-                            text += (
-                                f"，自 {alert.usage.since} 以来"
-                                f"已用电 {alert.usage.spent:.2f} 元"
-                            )
-                        chain = []
-                        if (
-                            MessageSession.from_str(alert.session).message_type
-                            == MessageType.GROUP_MESSAGE
-                        ):
-                            chain.append(At(qq=alert.qq))
-                            text = f" {text}"
-                        chain.append(Plain(text))
-                        await self.context.send_message(
-                            alert.session, MessageChain(chain)
-                        )
-                    except Exception as e:
-                        logger.warning(f"[cqu-astrcat] 提醒推送失败 qq={alert.qq}：{e}")
-            except Exception as e:
-                logger.error(f"[cqu-astrcat] 每日任务执行失败：{e}", exc_info=True)
+                    chain = []
+                    if (
+                        MessageSession.from_str(alert.session).message_type
+                        == MessageType.GROUP_MESSAGE
+                    ):
+                        chain.append(At(qq=alert.qq))
+                        text = f" {text}"
+                    chain.append(Plain(text))
+                    await self.context.send_message(alert.session, MessageChain(chain))
+                    pushed += 1
+                except Exception as e:
+                    logger.warning(f"[cqu-astrcat] 提醒推送失败 qq={alert.qq}：{e}")
+            return len(balances), pushed
+        except Exception as e:
+            logger.error(f"[cqu-astrcat] 每日任务执行失败：{e}", exc_info=True)
+            return None
 
     # ---------- 命令 ----------
     @filter.command_group("cqu")
@@ -209,3 +217,19 @@ class CquAstrcat(Star):
         if usage is not None and usage.spent > 0:
             text += f"\n📈 自 {usage.since} 以来已用电 {usage.spent:.2f} 元"
         yield event.plain_result(text)
+
+    # ---------- 调试入口（验证完毕后请连同本段一起删除） ----------
+    @cqu.command("debug_daily")
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    async def debug_daily(self, event: AstrMessageEvent):
+        """手动触发一次日结：/cqu debug_daily（仅管理员）
+
+        会向所有开启提醒且余额不足的用户推送消息，注意避免重复触发。
+        """
+        result = await self._daily_job()
+        if result is None:
+            yield event.plain_result("❌ 日结执行失败，详见日志")
+            return
+        yield event.plain_result(
+            f"✅ 日结完成：快照 {result[0]} 位，推送 {result[1]} 条"
+        )
