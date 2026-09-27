@@ -20,7 +20,7 @@ DAILY_HOUR = 9
 
 
 @register(
-    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.2.2"
+    "astrbot_plugin_cqu_astrcat", "Xiaokun10032", "简单的cqu一卡通聚合查询bot", "0.3"
 )
 class CquAstrcat(Star):
     """cqu 一卡通聚合查询插件入口：注册、生命周期与命令转发。"""
